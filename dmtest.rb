@@ -3,7 +3,16 @@
 require 'bundler/setup'
 Bundler.require :default, :development
 
-Encoding.default_internal = "BINARY"
+module DataMapper::Migrations::DataObjectsAdapter::SQL
+  alias :property_schema_hash_orig :property_schema_hash
+  def property_schema_hash(property)
+    schema = property_schema_hash_orig(property)
+    if schema[:primitive] == 'BYTEA'
+      schema.delete(:length)
+    end
+    schema
+  end
+end
 
 DM = DataMapper
 
@@ -15,17 +24,11 @@ class Release
   property :version, String
   property :file_data, Binary, :length => 16 * 1024 * 1024, :required => false
 
-=begin
-  def file_data=(data)
-    super(PGconn.escape_bytea(data))
-  end
-
   def file_data
     if fd = super
-      PGconn.unescape_bytea(fd)
+      PGconn.unescape_bytea(super)
     end
   end
-=end
 end
 
 class Mod
@@ -50,22 +53,21 @@ DM::Model.raise_on_save_failure = true
 DM.finalize
 DM.auto_migrate!
 
+file = File.open("/bin/ls", 'rb')
+file_data = file.read
+
 begin
   user = User.create()
   mod = Mod.create(:user => user)
   release = Release.create(:module => mod, :version => '1.1')
 
-  file = File.open("/bin/ls", "rb")
-  file_data = file.read
   puts file_data.length
   file_data = PGconn.escape_bytea(file_data)
-  DM.repository(:default).adapter.execute("update releases set file_data = ? where id = #{release.id}", file_data)
-  #DM.repository(:default).adapter.execute("update releases set file_data = '#{file_data}' where id = #{release.id}")
-  #release.file_data = file_data
-  #release.save
+
+  #DM.repository(:default).adapter.execute("update releases set file_data = ? where id = ?", file_data, release.id)
+  DM.repository(:default).adapter.execute("update releases set file_data = '#{file_data}' where id = #{release.id}")
 
   new_file = Release.first(:module => mod).file_data
-  new_file = PGconn.unescape_bytea(new_file)
   puts new_file.length
   File.unlink("ls")
   filenew = File.open("ls", "wb")
