@@ -9,4 +9,5 @@ gem 'rack-parser', :require => 'rack/parser'
 gem 'pg'
 
 gem 'dm-postgres-adapter'
+gem 'dm-sqlite-adapter'
 gem 'dm-core'

@@ -7,9 +7,7 @@ module DataMapper::Migrations::DataObjectsAdapter::SQL
   alias :property_schema_hash_orig :property_schema_hash
   def property_schema_hash(property)
     schema = property_schema_hash_orig(property)
-    if schema[:primitive] == 'BYTEA'
-      schema.delete(:length)
-    end
+    schema.delete(:length) if schema[:primitive] == 'BYTEA'
     schema
   end
 end
@@ -26,7 +24,11 @@ class Release
 
   def file_data
     if fd = super
-      PGconn.unescape_bytea(super)
+      case DataMapper.repository(:default).adapter.class.to_s
+      when /SqliteAdapter/ then super
+      when /PostgresAdapter/ then PGconn.unescape_bytea(super)
+      else super
+      end
     end
   end
 end
@@ -53,26 +55,45 @@ DM::Model.raise_on_save_failure = true
 DM.finalize
 DM.auto_migrate!
 
+puts DM.repository(:default).adapter.class.to_s
+
 file = File.open("/bin/ls", 'rb')
 file_data = file.read
+
+class String
+  def hex2bin
+    s = self
+    raise "Not a valid hex string" unless(s =~ /^[\da-fA-F]+$/)
+    s = '0' + s if((s.length & 1) != 0)
+    s.scan(/../).map{ |b| b.to_i(16) }.pack('C*')
+  end
+
+  def bin2hex
+    self.unpack('C*').map{ |b| "%02X" % b }.join('')
+  end
+end
 
 begin
   user = User.create()
   mod = Mod.create(:user => user)
   release = Release.create(:module => mod, :version => '1.1')
 
-  puts file_data.length
-  file_data = PGconn.escape_bytea(file_data)
-
-  #DM.repository(:default).adapter.execute("update releases set file_data = ? where id = ?", file_data, release.id)
-  DM.repository(:default).adapter.execute("update releases set file_data = '#{file_data}' where id = #{release.id}")
+  adapter = DM.repository(:default).adapter
+  statement = case adapter.class.to_s
+  when /SqliteAdapter/ then "update releases set file_data = X'#{file_data.bin2hex}' where id = #{release.id}"
+  when /PostgresAdapter/ then "update releases set file_data = '#{PGconn.escape_bytea(file_data)}' where id = #{release.id}"
+  else
+    puts "Invalid database"
+    exit(1)
+  end
+  adapter.execute(statement)
+  puts "Statement is: #{statement}"
 
   new_file = Release.first(:module => mod).file_data
   puts new_file.length
   File.unlink("ls")
   filenew = File.open("ls", "wb")
   filenew.write(new_file)
-
 rescue DataMapper::SaveFailureError => e
   puts "Class: #{e.resource}"
   puts e.resource.errors.full_messages.join(",")

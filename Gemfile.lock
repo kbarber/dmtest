@@ -32,6 +32,9 @@ GEM
       dm-do-adapter (~> 1.2.0)
       do_postgres (~> 0.10.6)
     dm-serializer (0.10.0)
+    dm-sqlite-adapter (1.2.0)
+      dm-do-adapter (~> 1.2.0)
+      do_sqlite3 (~> 0.10.6)
     dm-timestamps (0.10.0)
     dm-types (1.2.2)
       bcrypt-ruby (~> 3.0)
@@ -44,6 +47,8 @@ GEM
     dm-validations (1.2.0)
       dm-core (~> 1.2.0)
     do_postgres (0.10.8)
+      data_objects (= 0.10.8)
+    do_sqlite3 (0.10.8)
       data_objects (= 0.10.8)
     fastercsv (1.5.5)
     json (1.7.5)
@@ -65,5 +70,6 @@ DEPENDENCIES
   data_mapper
   dm-core
   dm-postgres-adapter
+  dm-sqlite-adapter
   pg
   rack-parser
