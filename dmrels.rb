@@ -14,15 +14,14 @@ DM.finalize
 class Release
   include DataMapper::Resource
 
-  belongs_to :module, :model => 'Mod'
-  #belongs_to :mod
+  belongs_to :module, 'Mod'
   property :id, Serial
 end
 
 class Mod
   include DataMapper::Resource
 
-  has n, :release
+  has n, :releases, child_key: [ :module_id ], model: Release
   belongs_to :user
   property :id, Serial
 end
@@ -30,7 +29,7 @@ end
 class User
   include DataMapper::Resource
 
-  has n, :mod
+  has n, :modules, model: Mod
   property :id, Serial
 end
 
@@ -39,9 +38,12 @@ DM.auto_migrate!
 begin
   user = User.create()
   mod = Mod.create(:user => user)
-  release = Release.create(:module => mod)
-  #release = Release.create(:mod => mod)
+  release1 = Release.create(:module => mod)
+  release2 = Release.create(:module => mod)
+
+  puts mod.releases.inspect
 rescue DataMapper::SaveFailureError => e
   puts e.message
   puts e.resource.errors.full_messages.join(", ")
 end
+
